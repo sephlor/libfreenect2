@@ -1192,12 +1192,12 @@ public:
 
       cudaDeviceProp prop;
       CHECK_CUDA(cudaGetDeviceProperties(&prop, i));
-      LOG_INFO << "device " << i << ": " << prop.name << " @ " << (prop.clockRate / 1000) << "MHz Memory " << (prop.totalGlobalMem >> 20) << "MB";
+      // LOG_INFO << "device " << i << ": " << prop.name << " @ " << (prop.clockRate / 1000) << "MHz Memory " << (prop.totalGlobalMem >> 20) << "MB";
 
-      if (prop.computeMode == cudaComputeModeProhibited) {
-        LOG_INFO << " Compute Mode Prohibited";
-        continue;
-      }
+      // if (prop.computeMode == cudaComputeModeProhibited) {
+      //   LOG_INFO << " Compute Mode Prohibited";
+      //   continue;
+      // }
 
       if (prop.major < 1) {
         LOG_INFO << " does not support CUDA";
