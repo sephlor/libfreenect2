@@ -37,6 +37,7 @@ OPTION(BUILD_OPENNI2_DRIVER "Build OpenNI2 driver" ON)
 OPTION(ENABLE_CXX11 "Enable C++11 support" OFF)
 OPTION(ENABLE_OPENCL "Enable OpenCL support" ON)
 OPTION(ENABLE_CUDA "Enable CUDA support" ON)
+OPTION(ENABLE_NVJPEG "Enable CUDA nvJPEG RGB decoding (requires CUDA)" ON)
 OPTION(ENABLE_OPENGL "Enable OpenGL support" ON)
 OPTION(ENABLE_VAAPI "Enable VA-API support" ON)
 OPTION(ENABLE_TEGRAJPEG "Enable Tegra HW JPEG support" ON)
@@ -363,11 +364,33 @@ IF(ENABLE_CUDA)
       SET(CUDA_FLAGS "${CUDA_FLAGS} -std=c++11")
     ENDIF()
 
+    SET(CUDA_SOURCES
+      src/cuda_depth_packet_processor.cu
+      src/cuda_kde_depth_packet_processor.cu
+    )
+
+    SET(HAVE_nvJPEG disabled)
+    IF(ENABLE_NVJPEG)
+      FIND_LIBRARY(NVJPEG_LIBRARY
+        NAMES nvjpeg
+        HINTS ${CUDA_TOOLKIT_ROOT_DIR}
+        PATH_SUFFIXES lib64 lib targets/sbsa-linux/lib targets/x86_64-linux/lib
+        NO_DEFAULT_PATH
+      )
+      FIND_PATH(NVJPEG_INCLUDE_DIR nvjpeg.h HINTS ${CUDA_INCLUDE_DIRS} ${CUDA_TOOLKIT_ROOT_DIR}/include)
+      SET(HAVE_nvJPEG no)
+      IF(NVJPEG_LIBRARY AND NVJPEG_INCLUDE_DIR)
+        SET(LIBFREENECT2_WITH_NVJPEG_SUPPORT 1)
+        SET(HAVE_nvJPEG yes)
+        LIST(APPEND CUDA_SOURCES src/nvjpeg_rgb_packet_processor.cu)
+        LIST(APPEND LIBRARIES ${NVJPEG_LIBRARY})
+      ENDIF()
+    ENDIF()
+
     SET(OLD_CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
     STRING(REGEX REPLACE "-std=c\\+\\+.." "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
     CUDA_COMPILE(CUDA_OBJECTS
-      src/cuda_depth_packet_processor.cu
-      src/cuda_kde_depth_packet_processor.cu
+      ${CUDA_SOURCES}
       OPTIONS ${CUDA_FLAGS}
     )
     SET(CMAKE_CXX_FLAGS "${OLD_CMAKE_CXX_FLAGS}")

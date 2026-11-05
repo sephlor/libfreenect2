@@ -142,5 +142,24 @@ private:
 };
 #endif //LIBFREENECT2_WITH_TEGRAJPEG_SUPPORT
 
+#ifdef LIBFREENECT2_WITH_NVJPEG_SUPPORT
+class NvJpegRgbPacketProcessorImpl;
+
+/** Processor to decode JPEG on the GPU using CUDA nvJPEG. */
+class NvJpegRgbPacketProcessor : public RgbPacketProcessor
+{
+public:
+  NvJpegRgbPacketProcessor();
+  virtual ~NvJpegRgbPacketProcessor();
+  virtual bool good();
+  virtual const char *name() { return "nvJPEG"; }
+  virtual void process(const libfreenect2::RgbPacket &packet);
+protected:
+  virtual Allocator *getAllocator();
+private:
+  NvJpegRgbPacketProcessorImpl *impl_;
+};
+#endif //LIBFREENECT2_WITH_NVJPEG_SUPPORT
+
 } /* namespace libfreenect2 */
 #endif /* RGB_PACKET_PROCESSOR_H_ */

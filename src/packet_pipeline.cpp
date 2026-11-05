@@ -38,6 +38,15 @@ namespace libfreenect2
 
 static RgbPacketProcessor *getDefaultRgbPacketProcessor()
 {
+#if defined(LIBFREENECT2_WITH_NVJPEG_SUPPORT)
+  // nvJPEG needs a CUDA device at runtime; fall through to the other decoders if it fails.
+  {
+    RgbPacketProcessor *nvjpeg = new NvJpegRgbPacketProcessor();
+    if (nvjpeg->good())
+      return nvjpeg;
+    delete nvjpeg;
+  }
+#endif
 #if defined(LIBFREENECT2_WITH_VT_SUPPORT)
   return new VTRgbPacketProcessor();
 #elif defined(LIBFREENECT2_WITH_VAAPI_SUPPORT)
