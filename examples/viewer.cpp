@@ -2,7 +2,7 @@
 #include <cstdlib>
 
 
-Viewer::Viewer() : shader_folder("src/shader/"), 
+Viewer::Viewer() : shader_folder("src/shader/"),
                    win_width(600),
                    win_height(400)
 {
@@ -49,14 +49,14 @@ void Viewer::initialize()
 
     std::string vertexshadersrc = ""
         "#version 330\n"
-                                                
+
         "in vec2 Position;"
         "in vec2 TexCoord;"
-                    
+
         "out VertexData{"
-        "vec2 TexCoord;" 
-        "} VertexOut;"  
-                    
+        "vec2 TexCoord;"
+        "} VertexOut;"
+
         "void main(void)"
         "{"
         "    gl_Position = vec4(Position, 0.0, 1.0);"
@@ -64,16 +64,16 @@ void Viewer::initialize()
         "}";
     std::string grayfragmentshader = ""
         "#version 330\n"
-        
+
         "uniform sampler2DRect Data;"
-        
+
         "vec4 tempColor;"
         "in VertexData{"
         "    vec2 TexCoord;"
         "} FragmentIn;"
-        
+
         "layout(location = 0) out vec4 Color;"
-        
+
         "void main(void)"
         "{"
             "ivec2 uv = ivec2(FragmentIn.TexCoord.x, FragmentIn.TexCoord.y);"
@@ -82,15 +82,15 @@ void Viewer::initialize()
         "}";
     std::string fragmentshader = ""
         "#version 330\n"
-        
+
         "uniform sampler2DRect Data;"
-        
+
         "in VertexData{"
         "    vec2 TexCoord;"
         "} FragmentIn;"
-       
+
         "layout(location = 0) out vec4 Color;"
-        
+
         "void main(void)"
         "{"
         "    ivec2 uv = ivec2(FragmentIn.TexCoord.x, FragmentIn.TexCoord.y);"
@@ -177,11 +177,11 @@ bool Viewer::render()
         float h = static_cast<float>(frame->height);
 
         Vertex bl = { -1.0f, -1.0f, 0.0f, 0.0f };
-        Vertex br = { 1.0f, -1.0f, w, 0.0f }; 
+        Vertex br = { 1.0f, -1.0f, w, 0.0f };
         Vertex tl = { -1.0f, 1.0f, 0.0f, h };
         Vertex tr = { 1.0f, 1.0f, w, h };
         Vertex vertices[] = {
-            bl, tl, tr, 
+            bl, tl, tr,
             tr, br, bl
         };
 
@@ -232,7 +232,7 @@ bool Viewer::render()
 
     // put the stuff we've been drawing onto the display
     glfwSwapBuffers(window);
-    // update other events like input handling 
+    // update other events like input handling
     glfwPollEvents();
 
     return shouldStop || glfwWindowShouldClose(window);

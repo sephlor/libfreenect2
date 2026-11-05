@@ -165,7 +165,7 @@ public:
   /** Sets the RGB camera to fully automatic exposure setting.
    * Exposure compensation: negative value gives an underexposed image,
    * positive gives an overexposed image.
-   * 
+   *
    * @param exposure_compensation Exposure compensation, range [-2.0, 2.0]
    */
   virtual void setColorAutoExposure(float exposure_compensation = 0) = 0;
@@ -184,7 +184,7 @@ public:
    * a pseudo-exposure time of between (10.0, 16.667) ms, which will automatically drop
    * the integration time to 10 or 8.3 ms depending on country, while setting the analog
    * gain control to a brighter value.
-   * 
+   *
    * @param pseudo_exposure_time_ms Pseudo-exposure time in milliseconds, range (0.0, 66.0+]
    */
   virtual void setColorSemiAutoExposure(float pseudo_exposure_time_ms) = 0;
