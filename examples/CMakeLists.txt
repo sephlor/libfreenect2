@@ -73,6 +73,15 @@ IF(ENABLE_OPENGL)
   ENDIF()
 ENDIF(ENABLE_OPENGL)
 
+# Color frames from the nvJPEG decoder are in CUDA device memory; the viewer
+# downloads them for display.
+FIND_PACKAGE(CUDA QUIET)
+IF(CUDA_FOUND)
+  INCLUDE_DIRECTORIES(${CUDA_INCLUDE_DIRS})
+  LIST(APPEND Protonect_LIBRARIES ${CUDA_CUDART_LIBRARY})
+  ADD_DEFINITIONS(-DEXAMPLES_WITH_CUDA_SUPPORT=1)
+ENDIF()
+
 ADD_EXECUTABLE(Protonect
   ${Protonect_src}
 )

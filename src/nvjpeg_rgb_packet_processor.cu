@@ -26,9 +26,13 @@
 
 /** @file nvjpeg_rgb_packet_processor.cu JPEG decoder using CUDA nvJPEG.
  *
- * Follows the same data flow as CudaDepthPacketProcessor:
+ * Data flow:
  *   USB -> pinned host input buffer (our allocator) -> device decode
- *   -> device BGRX -> one D2H copy into a pinned, pooled output Frame.
+ *   -> BGR->BGRX kernel writes straight into a pooled *device* output Frame.
+ *
+ * There is no copy back to the host: Frame::data of the color frames handed to
+ * the listener is a CUDA device pointer and must not be dereferenced on the
+ * CPU. Registration::apply detects this and runs on the GPU.
  */
 
 #include <libfreenect2/rgb_packet_processor.h>
@@ -59,7 +63,7 @@ __global__ void bgrToBgrxKernel(const unsigned char *__restrict__ bgr, uchar4 *_
   bgrx[i] = make_uchar4(p[0], p[1], p[2], 0xff);
 }
 
-/* Frame whose memory comes from a (pooled) pinned allocator. */
+/* Frame whose memory comes from a (pooled) allocator. */
 class NvJpegFrame: public Frame
 {
 public:
@@ -110,6 +114,35 @@ public:
   }
 };
 
+/* Device memory allocator for the output frames. Wrapped in a PoolAllocator,
+ * so cudaMalloc runs at most twice and the two buffers are reused. */
+class NvJpegDeviceAllocator: public Allocator
+{
+public:
+  virtual Buffer *allocate(size_t size)
+  {
+    Buffer *b = new Buffer();
+    b->length = 0;
+    b->capacity = size;
+    cudaError_t err = cudaMalloc(&b->data, size);
+    if (err != cudaSuccess)
+    {
+      LOG_ERROR << "cudaMalloc: " << cudaGetErrorString(err);
+      b->data = NULL;
+    }
+    return b;
+  }
+
+  virtual void free(Buffer *b)
+  {
+    if (b == NULL)
+      return;
+    if (b->data)
+      CALL_CUDA(cudaFree(b->data));
+    delete b;
+  }
+};
+
 class NvJpegRgbPacketProcessorImpl: public WithPerfLogging
 {
 public:
@@ -129,7 +162,6 @@ public:
   nvjpegBackend_t backend;
 
   unsigned char *d_bgr;   // 1920x1080x3, decoder output
-  uchar4 *d_bgrx;         // 1920x1080x4, expanded
 
   Allocator *input_allocator;
   Allocator *frame_allocator;
@@ -147,7 +179,6 @@ public:
     decode_params(0),
     backend(NVJPEG_BACKEND_DEFAULT),
     d_bgr(NULL),
-    d_bgrx(NULL),
     input_allocator(NULL),
     frame_allocator(NULL),
     frame(NULL)
@@ -157,7 +188,7 @@ public:
       return;
 
     input_allocator = new PoolAllocator(new NvJpegPinnedAllocator());
-    frame_allocator = new PoolAllocator(new NvJpegPinnedAllocator());
+    frame_allocator = new PoolAllocator(new NvJpegDeviceAllocator());
     newFrame();
   }
 
@@ -175,7 +206,6 @@ public:
     if (decoder) CALL_NVJPEG(nvjpegDecoderDestroy(decoder));
     if (handle) CALL_NVJPEG(nvjpegDestroy(handle));
     if (d_bgr) CALL_CUDA(cudaFree(d_bgr));
-    if (d_bgrx) CALL_CUDA(cudaFree(d_bgrx));
     if (stream) CALL_CUDA(cudaStreamDestroy(stream));
   }
 
@@ -211,7 +241,6 @@ public:
     CHECK_NVJPEG(nvjpegDecodeParamsSetOutputFormat(decode_params, NVJPEG_OUTPUT_BGRI));
 
     CHECK_CUDA(cudaMalloc(&d_bgr, PIXELS * 3));
-    CHECK_CUDA(cudaMalloc(&d_bgrx, PIXELS * 4));
 
     LOG_INFO << "nvJPEG decoder initialized (backend " << (backend == NVJPEG_BACKEND_GPU_HYBRID ? "GPU_HYBRID" : "HYBRID") << ")";
     return true;
@@ -250,10 +279,16 @@ public:
 
     const int block = 256;
     const int grid = (int)((PIXELS + block - 1) / block);
-    bgrToBgrxKernel<<<grid, block, 0, stream>>>(d_bgr, d_bgrx, (int)PIXELS);
+    if (frame->data == NULL)
+    {
+      LOG_ERROR << "nvJPEG: no device memory for output frame";
+      return false;
+    }
+    bgrToBgrxKernel<<<grid, block, 0, stream>>>(d_bgr, reinterpret_cast<uchar4 *>(frame->data), (int)PIXELS);
     CHECK_CUDA(cudaGetLastError());
 
-    CHECK_CUDA(cudaMemcpyAsync(frame->data, d_bgrx, PIXELS * 4, cudaMemcpyDeviceToHost, stream));
+    /* Wait for the kernel only (no copy), so the frame is complete and safe to
+     * use from any stream once the listener receives it. */
     CHECK_CUDA(cudaStreamSynchronize(stream));
     return true;
   }

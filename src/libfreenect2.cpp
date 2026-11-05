@@ -1439,7 +1439,7 @@ bool Freenect2ReplayDevice::processRawFrame(Frame::Type type, Frame* frame)
 void Freenect2ReplayDevice::processRgbFrame(Frame* frame)
 {
   RgbPacket packet;
-  
+
   packet.timestamp = frame->timestamp;
   packet.sequence = frame->sequence;
   packet.jpeg_buffer = frame->data;
@@ -1459,7 +1459,7 @@ void Freenect2ReplayDevice::processDepthFrame(Frame* frame)
   packet.sequence = frame->sequence;
   packet.buffer = frame->data;
   packet.buffer_length = frame->bytes_per_pixel;
- 
+
   pipeline_->getDepthPacketProcessor()->process(packet);
 }
 
@@ -1510,7 +1510,7 @@ bool hasSuffix(const std::string& str, const std::string& suffix)
 bool parseFrameFilename(const std::string& frame_filename, size_t timestamp_sequence[2])
 {
   LOG_DEBUG << "parsing: " << frame_filename;
-  
+
   if (!hasSuffix(frame_filename, ".depth") &&
     !hasSuffix(frame_filename, ".jpg") &&
     !hasSuffix(frame_filename, ".jpeg"))
@@ -1518,7 +1518,7 @@ bool parseFrameFilename(const std::string& frame_filename, size_t timestamp_sequ
     LOG_ERROR << "wrong suffix in the filename; need .depth, .jpg, or .jpeg";
     return false;
   }
-  
+
   size_t ix1 = frame_filename.find("_");
   size_t ix2 = frame_filename.find("_", ix1 + 1);
   size_t ix3 = frame_filename.find(".", ix2 + 1);
@@ -1533,7 +1533,7 @@ bool parseFrameFilename(const std::string& frame_filename, size_t timestamp_sequ
     LOG_ERROR << "could not extract timestamp or sequence";
     return false;
   }
-  
+
   timestamp_sequence[0] = atoi(ts.c_str());
   timestamp_sequence[1] = atoi(seq.c_str());
 
@@ -1544,14 +1544,14 @@ bool parseFrameFilename(const std::string& frame_filename, size_t timestamp_sequ
     LOG_WARNING << "invalid timestamp";
     return false;
   }
-  
+
   return true;
 }
 
 void Freenect2ReplayDevice::run()
 {
   size_t timestamp_sequence[2] = {0};
-    
+
   for (size_t i = 0; i < frame_filenames_.size() && running_; i++)
   {
     std::string frame = frame_filenames_[i];
@@ -1565,7 +1565,7 @@ void Freenect2ReplayDevice::run()
     if (hasSuffix(frame, ".depth"))
     {
       std::ifstream fd(frame.c_str());
-      
+
       if(!fd)
       {
         LOG_ERROR << "failed to open replay frame: " << frame << ", skipping...";

@@ -29,7 +29,12 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 #include <libfreenect2/registration.h>
+#include <libfreenect2/config.h>
 #include <limits>
+#ifdef LIBFREENECT2_WITH_CUDA_SUPPORT
+#include <libfreenect2/registration_cuda.h>
+#include <libfreenect2/logging.h>
+#endif
 
 namespace libfreenect2
 {
@@ -47,6 +52,7 @@ class RegistrationImpl
 {
 public:
   RegistrationImpl(Freenect2Device::IrCameraParams depth_p, Freenect2Device::ColorCameraParams rgb_p);
+  ~RegistrationImpl();
 
   void apply(int dx, int dy, float dz, float& cx, float &cy) const;
   void apply(const Frame* rgb, const Frame* depth, Frame* undistorted, Frame* registered, const bool enable_filter, Frame* bigdepth, int* color_depth_map) const;
@@ -68,6 +74,11 @@ private:
   const int filter_width_half;
   const int filter_height_half;
   const float filter_tolerance;
+
+#ifdef LIBFREENECT2_WITH_CUDA_SUPPORT
+  /* Created on first use, when a color frame in device memory shows up. */
+  mutable RegistrationCuda *cuda_;
+#endif
 };
 
 void RegistrationImpl::distort(int mx, int my, float& x, float& y) const
@@ -134,6 +145,21 @@ void RegistrationImpl::apply(const Frame *rgb, const Frame *depth, Frame *undist
       undistorted->width != 512 || undistorted->height != 424 || undistorted->bytes_per_pixel != 4 ||
       registered->width != 512 || registered->height != 424 || registered->bytes_per_pixel != 4)
     return;
+
+#ifdef LIBFREENECT2_WITH_CUDA_SUPPORT
+  /* Color frames from NvJpegRgbPacketProcessor live in device memory and
+   * cannot be read on the CPU: register on the GPU instead. */
+  if (RegistrationCuda::isDevicePointer(rgb->data))
+  {
+    if (!cuda_)
+      cuda_ = new RegistrationCuda(distort_map, depth_to_color_map_x, depth_to_color_map_yi,
+                                   color.shift_m, color.fx, color.cx + 0.5f,
+                                   filter_width_half, filter_height_half, filter_tolerance);
+    if (!cuda_->apply(rgb, depth, undistorted, registered, enable_filter, bigdepth, color_depth_map))
+      LOG_ERROR << "CUDA registration failed";
+    return;
+  }
+#endif
 
   const float *depth_data = (float*)depth->data;
   const unsigned int *rgb_data = (unsigned int*)rgb->data;
@@ -369,6 +395,9 @@ Registration::~Registration()
 
 RegistrationImpl::RegistrationImpl(Freenect2Device::IrCameraParams depth_p, Freenect2Device::ColorCameraParams rgb_p):
   depth(depth_p), color(rgb_p), filter_width_half(2), filter_height_half(1), filter_tolerance(0.01f)
+#ifdef LIBFREENECT2_WITH_CUDA_SUPPORT
+  , cuda_(NULL)
+#endif
 {
   float mx, my;
   int ix, iy, index;
@@ -400,6 +429,13 @@ RegistrationImpl::RegistrationImpl(Freenect2Device::IrCameraParams depth_p, Free
       *map_yi++ = (int)(ry + 0.5f);
     }
   }
+}
+
+RegistrationImpl::~RegistrationImpl()
+{
+#ifdef LIBFREENECT2_WITH_CUDA_SUPPORT
+  delete cuda_;
+#endif
 }
 
 } /* namespace libfreenect2 */

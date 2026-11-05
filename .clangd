@@ -1,0 +1,17 @@
+# clangd config for libfreenect2.
+# The .cu files are built via legacy FindCUDA (CUDA_COMPILE), which does not
+# emit compile_commands.json entries, so clangd interpolates flags from a .cpp.
+# Add what nvcc gets from CMakeLists.txt (CUDA_INCLUDE_DIRECTORIES + cuda-samples).
+If:
+  PathMatch: .*\.cuh?
+CompileFlags:
+  Add:
+    - -xcuda
+    - --cuda-path=/usr/local/cuda
+    - --cuda-gpu-arch=sm_120
+    - --no-cuda-version-check
+    - -I/home/coder/portland/libfreenect2/include
+    - -I/home/coder/portland/libfreenect2/include/internal
+    - -I/home/coder/portland/libfreenect2/build
+    - -I/home/coder/portland/libfreenect2/cuda-samples/Common
+    - -I/usr/local/cuda/include

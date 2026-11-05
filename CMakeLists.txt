@@ -367,6 +367,7 @@ IF(ENABLE_CUDA)
     SET(CUDA_SOURCES
       src/cuda_depth_packet_processor.cu
       src/cuda_kde_depth_packet_processor.cu
+      src/registration_cuda.cu
     )
 
     SET(HAVE_nvJPEG disabled)

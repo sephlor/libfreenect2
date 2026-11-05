@@ -27,6 +27,7 @@
 /** @file Protonect.cpp Main application file. */
 
 #include <iostream>
+#include <chrono>
 #include <cstdlib>
 #include <signal.h>
 
@@ -39,6 +40,9 @@
 /// [headers]
 #ifdef EXAMPLES_WITH_OPENGL_SUPPORT
 #include "viewer.h"
+#endif
+#ifdef EXAMPLES_WITH_CUDA_SUPPORT
+#include <cuda_runtime.h>
 #endif
 
 
@@ -337,6 +341,11 @@ int main(int argc, char *argv[])
 /// [registration setup]
 
   size_t framecount = 0;
+#ifdef EXAMPLES_WITH_CUDA_SUPPORT
+  libfreenect2::Frame rgb_host(1920, 1080, 4); // display copy of device color frames
+#endif
+  double reg_ms_acc = 0.0;
+  size_t reg_n = 0;
 #ifdef EXAMPLES_WITH_OPENGL_SUPPORT
   Viewer viewer;
   if (viewer_enabled)
@@ -360,9 +369,17 @@ int main(int argc, char *argv[])
 
     if (enable_rgb && enable_depth)
     {
+      std::chrono::steady_clock::time_point reg_t0 = std::chrono::steady_clock::now();
 /// [registration]
       registration->apply(rgb, depth, &undistorted, &registered);
 /// [registration]
+      reg_ms_acc += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - reg_t0).count();
+      if (++reg_n == 100)
+      {
+        std::cout << "[Registration::apply] avg. time: " << (reg_ms_acc / reg_n) << "ms" << std::endl;
+        reg_ms_acc = 0.0;
+        reg_n = 0;
+      }
     }
 
     framecount++;
@@ -377,7 +394,22 @@ int main(int argc, char *argv[])
 #ifdef EXAMPLES_WITH_OPENGL_SUPPORT
     if (enable_rgb)
     {
-      viewer.addFrame("RGB", rgb);
+      libfreenect2::Frame *rgb_display = rgb;
+#ifdef EXAMPLES_WITH_CUDA_SUPPORT
+      // nvJPEG color frames are in device memory; download for display only.
+      cudaPointerAttributes attr;
+      if (cudaPointerGetAttributes(&attr, rgb->data) == cudaSuccess && attr.type == cudaMemoryTypeDevice)
+      {
+        cudaMemcpy(rgb_host.data, rgb->data, 1920 * 1080 * 4, cudaMemcpyDeviceToHost);
+        rgb_host.format = rgb->format;
+        rgb_display = &rgb_host;
+      }
+      else
+      {
+        cudaGetLastError();
+      }
+#endif
+      viewer.addFrame("RGB", rgb_display);
     }
     if (enable_depth)
     {
